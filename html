@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>祐那の好き嫌いTier表</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background-color: #e6f0ff;
+      margin: 0;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      color: #0066cc;
+      margin-bottom: 10px;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      width: 100%;
+      max-width: 900px;
+    }
+
+    .food-list, .tier {
+      background-color: #ffffff;
+      border-radius: 10px;
+      padding: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    .food-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .food {
+      padding: 6px 10px;
+      background-color: #cce0ff;
+      border-radius: 6px;
+      cursor: grab;
+      user-select: none;
+      font-size: 14px;
+    }
+
+    .tiers {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .tier {
+      min-height: 70px;
+      border: 2px dashed #99ccff;
+      transition: background-color 0.3s ease;
+      position: relative;
+    }
+
+    .tier h3 {
+      margin: 0 0 5px 0;
+      color: #004080;
+    }
+
+    .tier.over {
+      background-color: #e0f2ff;
+    }
+
+    .feedback {
+      position: absolute;
+      right: 10px;
+      bottom: 5px;
+      font-size: 24px;
+      animation: fadeout 1.5s forwards;
+    }
+
+    @keyframes fadeout {
+      0% {opacity: 1;}
+      100% {opacity: 0;}
+    }
+
+    #result {
+      margin-top: 20px;
+      font-size: 20px;
+      color: #004080;
+      font-weight: bold;
+    }
+
+    #resetBtn {
+      margin-top: 10px;
+      padding: 8px 16px;
+      background-color: #3399ff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      .food {
+        font-size: 12px;
+        padding: 5px 8px;
+      }
+
+      .tier h3 {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>祐那の好き嫌いTier表</h1>
+  <div class="container">
+    <div class="food-list" id="foodList"></div>
+    <div class="tiers" id="tiers"></div>
+  </div>
+  <div id="result"></div>
+  <button id="resetBtn">もう一度遊ぶ</button>
+
+  <script>
+    const tierData = {
+      A: { label: "Aランク - 好き", items: ["きゅうり", "オクラ", "にんじん（ブロック状で茹でられたもの以外）", "トマト", "なす"] },
+      B: { label: "Bランク - 普通", items: ["レタス（茹でてない状態）", "キャベツ", "ダイコン", "納豆"] },
+      C: { label: "Cランク - 好きではないが、場面によっては食べる", items: ["ピーマン", "塊で茹でられたにんじん", "ケチャップライス", "ナポリタン", "ラム肉", "茹でられたレタス", "ゴーヤ"] },
+      D: { label: "Dランク - 口にしたくない", items: ["セロリ", "椎茸", "パプリカ", "レバー", "ミョウガ", "いわし"] }
+    };
+
+    const foodListEl = document.getElementById('foodList');
+    const tiersEl = document.getElementById('tiers');
+    const resultEl = document.getElementById('result');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let draggedItem = null;
+
+    function initGame() {
+      foodListEl.innerHTML = '';
+      tiersEl.innerHTML = '';
+      resultEl.textContent = '';
+      resetBtn.style.display = 'none';
+
+      let allFoods = [];
+      for (let key in tierData) {
+        allFoods = allFoods.concat(tierData[key].items);
+      }
+      allFoods = shuffle(allFoods);
+
+      allFoods.forEach(food => {
+        const div = document.createElement('div');
+        div.className = 'food';
+        div.textContent = food;
+        div.setAttribute('draggable', 'true');
+        addDragEvents(div);
+        foodListEl.appendChild(div);
+      });
+
+      for (let tierKey in tierData) {
+        const tierBox = document.createElement('div');
+        tierBox.className = 'tier';
+        tierBox.dataset.rank = tierKey;
+
+        const title = document.createElement('h3');
+        title.textContent = tierData[tierKey].label;
+        tierBox.appendChild(title);
+
+        addDropEvents(tierBox);
+        tiersEl.appendChild(tierBox);
+      }
+    }
+
+    function addDragEvents(el) {
+      el.addEventListener('dragstart', () => {
+        draggedItem = el;
+      });
+
+      el.addEventListener('touchstart', (e) => {
+        draggedItem = el;
+      });
+    }
+
+    function addDropEvents(el) {
+      el.addEventListener('dragover', e => e.preventDefault());
+      el.addEventListener('drop', () => {
+        handleDrop(el);
+      });
+
+      el.addEventListener('touchmove', e => e.preventDefault());
+      el.addEventListener('touchend', (e) => {
+        const touch = e.changedTouches[0];
+        const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (dropTarget && dropTarget.closest('.tier') === el) {
+          handleDrop(el);
+        }
+      });
+
+      el.addEventListener('dragenter', () => el.classList.add('over'));
+      el.addEventListener('dragleave', () => el.classList.remove('over'));
+    }
+
+    function handleDrop(targetEl) {
+      if (!draggedItem) return;
+      const foodName = draggedItem.textContent;
+      const tier = targetEl.dataset.rank;
+      const isCorrect = tierData[tier].items.includes(foodName);
+
+      const feedback = document.createElement('div');
+      feedback.className = 'feedback';
+      feedback.textContent = isCorrect ? '🌸' : '❌';
+      targetEl.appendChild(feedback);
+      setTimeout(() => feedback.remove(), 1500);
+
+      targetEl.appendChild(draggedItem);
+      draggedItem = null;
+      checkAnswer();
+    }
+
+    function checkAnswer() {
+      for (let tier of document.querySelectorAll('.tier')) {
+        const tierKey = tier.dataset.rank;
+        const correctItems = tierData[tierKey].items;
+        const actualItems = Array.from(tier.querySelectorAll('.food')).map(f => f.textContent);
+
+        if (correctItems.length !== actualItems.length) return;
+        for (let item of correctItems) {
+          if (!actualItems.includes(item)) return;
+        }
+      }
+      resultEl.textContent = "🎉 祐那の好き嫌い攻略！ 🎉";
+      resetBtn.style.display = 'inline-block';
+    }
+
+    resetBtn.addEventListener('click', initGame);
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    initGame();
+  </script>
+</body>
+</html>
